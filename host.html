@@ -385,7 +385,6 @@ code{background:var(--chip);padding:2px 6px;border-radius:6px;font-size:14px;ove
   const ms = 'mediaSession' in navigator ? navigator.mediaSession : null;
   let msKey = '';
   function updateCarDisplay() {
-    if (!ms || !window.MediaMetadata) return;
     const s = cur(), st = game?.status || 'lobby', code = host?.code || '';
     const n = s ? `Song ${idx + 1} of ${queue.length}` : '';
     const leader = [...players].sort((x, y) => y.score - x.score)[0];
@@ -400,7 +399,10 @@ code{background:var(--chip);padding:2px 6px;border-radius:6px;font-size:14px;ove
     const key = JSON.stringify(m);
     if (key === msKey) return;
     msKey = key;
-    try { ms.metadata = new MediaMetadata(m); } catch {}
+    // Spotify's in-browser player runs inside its own frame, so many phones ignore the
+    // metadata above and show the page title instead. Put the game text in the title too.
+    document.title = m.title.replace('🔔 ', '') + (st === 'scored' && s ? ' – ' + s.artist : '');
+    if (ms && window.MediaMetadata) try { ms.metadata = new MediaMetadata(m); } catch {}
   }
   // The music player can overwrite the text when a track starts, so re-apply it shortly after.
   const reapplyCarDisplay = () => { msKey = ''; updateCarDisplay(); setTimeout(() => { msKey = ''; updateCarDisplay(); }, 1500); };
