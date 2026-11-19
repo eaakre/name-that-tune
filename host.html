@@ -306,7 +306,7 @@ code{background:var(--chip);padding:2px 6px;border-radius:6px;font-size:14px;ove
       if (webDeviceId) return res();
       const init = () => {
         webPlayer = new Spotify.Player({ name: 'Name That Tune (browser)', getOAuthToken: cb => token().then(cb), volume: 0.85 });
-        webPlayer.addListener('ready', ({ device_id }) => { webDeviceId = device_id; toast('This browser is ready to play'); res(); });
+        webPlayer.addListener('ready', ({ device_id }) => { webDeviceId = device_id; setCarButtons(); toast('This browser is ready to play'); res(); });
         webPlayer.addListener('initialization_error', ({ message }) => { toast('This browser can’t play Spotify: ' + message); res(); });
         webPlayer.addListener('account_error', () => { toast('Browser playback needs Spotify Premium'); res(); });
         webPlayer.addListener('authentication_error', ({ message }) => { toast(message); res(); });
@@ -357,7 +357,7 @@ code{background:var(--chip);padding:2px 6px;border-radius:6px;font-size:14px;ove
     if (deviceId === '__web' && !webDeviceId) await startWebPlayer();
     const s = queue[idx + 1]; curPos = startPos(s);
     $('#nextBtn').disabled = true;
-    try { await playSong(s); idx++; saveQ(); await act('open'); }
+    try { await playSong(s); idx++; saveQ(); await act('open'); setCarButtons(); reapplyCarDisplay(); }
     catch (err) { toast(err.message); }
     renderQueue(); render();
   };
@@ -369,7 +369,7 @@ code{background:var(--chip);padding:2px 6px;border-radius:6px;font-size:14px;ove
   $('#lockBtn').onclick = async () => { try { await act(game?.status === 'open' ? 'lock' : 'reopen'); } catch (err) { toast(err.message); } };
   $('#pauseBtn').onclick = pause;
   $('#resumeBtn').onclick = resume;
-  $('#replayBtn').onclick = () => cur() && playSong(cur()).catch(err => toast(err.message));
+  $('#replayBtn').onclick = () => cur() && playSong(cur()).then(reapplyCarDisplay, err => toast(err.message));
   $('#hideBtn').onclick = () => { hideAns = !hideAns; $('#hideBtn').setAttribute('aria-pressed', hideAns); $('#hideBtn').textContent = hideAns ? 'Show answer' : 'Hide answer'; render(); };
   $('#resetScores').onclick = async () => { try { await act('reset_scores'); toast('Scores reset'); } catch (err) { toast(err.message); } };
   $('#board').onclick = async e => { const b = e.target.closest('button'); if (!b) return;
@@ -379,8 +379,44 @@ code{background:var(--chip);padding:2px 6px;border-radius:6px;font-size:14px;ove
   function beep() { try { actx = actx || new AudioContext(); const o = actx.createOscillator(), g = actx.createGain(); o.type = 'square'; o.frequency.value = 196; g.gain.setValueAtTime(.25, actx.currentTime); g.gain.exponentialRampToValueAtTime(.001, actx.currentTime + .6); o.connect(g).connect(actx.destination); o.start(); o.stop(actx.currentTime + .6); } catch {} }
   document.addEventListener('click', () => { try { actx = actx || new AudioContext(); actx.resume(); } catch {} }, { once: true });
 
+  /* ---------- Car / Bluetooth display (Media Session) ----------
+     When music plays in this browser, phones send this text to car radios and
+     headphones over Bluetooth, and the car's buttons come back as actions. */
+  const ms = 'mediaSession' in navigator ? navigator.mediaSession : null;
+  let msKey = '';
+  function updateCarDisplay() {
+    if (!ms || !window.MediaMetadata) return;
+    const s = cur(), st = game?.status || 'lobby', code = host?.code || '';
+    const n = s ? `Song ${idx + 1} of ${queue.length}` : '';
+    const leader = [...players].sort((x, y) => y.score - x.score)[0];
+    const lead = leader && leader.score > 0 ? `Leader: ${leader.name} (${leader.score})` : 'Name That Tune';
+    const buzzer = players.find(p => p.id === game?.buzz_player_id);
+    let m;
+    if (!s) m = { title: 'Name That Tune', artist: code ? 'Join with code ' + code : '', album: lead };
+    else if (st === 'locked' && buzzer) m = { title: '🔔 ' + buzzer.name + ' buzzed in!', artist: n, album: lead };
+    else if (st === 'locked') m = { title: n + ' · Buzzers paused', artist: 'Code ' + code, album: lead };
+    else if (st === 'scored') m = { title: s.title, artist: s.artist + (game.answer?.by ? ' · ' + game.answer.by + ' got it!' : ''), album: lead, artwork: s.art ? [{ src: s.art, sizes: '300x300', type: 'image/jpeg' }] : [] };
+    else m = { title: n + ' · Mystery song', artist: 'Buzz in to guess! Code ' + code, album: lead };
+    const key = JSON.stringify(m);
+    if (key === msKey) return;
+    msKey = key;
+    try { ms.metadata = new MediaMetadata(m); } catch {}
+  }
+  // The music player can overwrite the text when a track starts, so re-apply it shortly after.
+  const reapplyCarDisplay = () => { msKey = ''; updateCarDisplay(); setTimeout(() => { msKey = ''; updateCarDisplay(); }, 1500); };
+  function setCarButtons() {
+    if (!ms) return;
+    const on = (a, fn) => { try { ms.setActionHandler(a, fn); } catch {} };
+    on('nexttrack', () => { if (!$('#nextBtn').disabled) $('#nextBtn').click(); });
+    on('previoustrack', () => $('#replayBtn').click());
+    on('pause', () => { pause(); try { ms.playbackState = 'paused'; } catch {} });
+    on('play', () => { resume(); try { ms.playbackState = 'playing'; } catch {} });
+  }
+  setCarButtons();
+
   let qrFor = '';
   function render() {
+    updateCarDisplay();
     $('#noGame').classList.toggle('hide', !!host); $('#hasGame').classList.toggle('hide', !host);
     if (host) {
       $('#bigCode').textContent = host.code; $('#joinUrl').textContent = location.host;
