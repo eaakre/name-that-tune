@@ -29,8 +29,8 @@ function toast(msg) {
 function watchGame(gameId, onGame, onPlayers) {
   let stopped = false;
   const loadGame = async () => {
-    const { data } = await sb.from('buzz_games').select('*').eq('id', gameId).maybeSingle();
-    if (!stopped) onGame(data);
+    const { data, error } = await sb.from('buzz_games').select('*').eq('id', gameId).maybeSingle();
+    if (!stopped && !error) onGame(data); // null only when the game is really gone
   };
   const loadPlayers = async () => {
     const { data } = await sb.from('buzz_players').select('id,name,score,joined_at').eq('game_id', gameId).order('joined_at');

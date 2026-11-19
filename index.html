@@ -69,7 +69,7 @@
 <script>
 {
   const KEY = 'buzz_player';
-  let me = store.get(KEY), game = null, players = [], stop = null, pressing = false;
+  let me = store.get(KEY), game, players, stop = null, pressing = false;
 
   const params = new URLSearchParams(location.search);
   if (params.get('code')) $('#code').value = params.get('code').toUpperCase().slice(0, 4);
@@ -94,7 +94,7 @@
   }
 
   function leave() {
-    if (stop) stop(); stop = null; store.del(KEY); me = null; game = null;
+    if (stop) stop(); stop = null; store.del(KEY); me = null; game = undefined; players = undefined;
     $('#playView').classList.add('hide'); $('#joinView').classList.remove('hide');
   }
   $('#leave').addEventListener('click', leave);
@@ -102,7 +102,7 @@
   const nameOf = id => players.find(p => p.id === id)?.name || 'Someone';
 
   function render() {
-    if (!me) return;
+    if (!me || game === undefined || players === undefined) return; // still loading
     if (game === null) { leave(); $('#joinErr').textContent = 'That game is no longer running.'; return; }
     if (players.length && !players.some(p => p.id === me.player_id)) { leave(); $('#joinErr').textContent = 'You were removed from the game. You can join again.'; return; }
     const mine = players.find(p => p.id === me.player_id);
