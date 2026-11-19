@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#1534c8">
+<title>Host · Name That Tune</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Rubik:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+.grid{display:grid;gap:18px;grid-template-columns:minmax(0,1fr)}
+@media(min-width:900px){.grid{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);align-items:start}}
+.joinbox{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.bigcode{font-family:Bungee,sans-serif;font-size:clamp(44px,10vw,72px);letter-spacing:.12em;line-height:1;color:var(--stage)}
+:root[data-theme=dark] .bigcode{color:var(--lemon)}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .bigcode{color:var(--lemon)}}
+#qr{background:#fff;padding:8px;border-radius:12px;flex:none}
+#qr img,#qr canvas{display:block;width:112px;height:112px}
+.joinurl{font-weight:600;overflow-wrap:anywhere}
+.round{text-align:center}
+.round .num{color:var(--soft);font-weight:600}
+.now{display:flex;gap:16px;align-items:center;text-align:left;margin:14px 0;padding:14px;border-radius:16px;background:var(--chip)}
+.now img{width:84px;height:84px;border-radius:12px;object-fit:cover;flex:none}
+.now .t{font-size:20px;white-space:normal}
+.now.hidden .meta{filter:blur(9px)}
+.buzzed{border-radius:18px;padding:18px;margin:12px 0;background:var(--lemon);color:#10142b;animation:pop .35s ease-out}
+.buzzed .who{font-family:Bungee,sans-serif;font-size:clamp(32px,7vw,48px);line-height:1.05;overflow-wrap:anywhere}
+@keyframes pop{from{transform:scale(.85);opacity:0}}
+.state{display:inline-block;padding:4px 12px;border-radius:999px;background:var(--chip);font-weight:700;font-size:14px}
+.state.open{background:var(--ok);color:#fff}
+.judge{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.judge button{min-height:60px;font-size:18px}
+.ctrls{justify-content:center;margin-top:12px}
+.queue li.played{opacity:.45}
+.queue li.current{background:var(--chip);border-radius:10px;padding-inline:8px}
+.qn{width:26px;text-align:right;color:var(--soft);font-variant-numeric:tabular-nums;flex:none}
+.pl{cursor:pointer}
+.pl:hover .t{text-decoration:underline}
+.scroller{max-height:440px;overflow:auto;margin-top:8px}
+.step{display:flex;gap:10px;margin:8px 0}
+.step b{flex:none;width:26px;height:26px;border-radius:50%;background:var(--stage);color:#fff;display:grid;place-items:center;font-size:14px}
+code{background:var(--chip);padding:2px 6px;border-radius:6px;font-size:14px;overflow-wrap:anywhere}
+.setgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0 14px}
+.chk{display:flex;align-items:center;gap:10px;margin-top:14px;font-weight:600}
+.chk input{width:22px;height:22px}
+</style>
+</head>
+<body>
+<header class="top"><a class="brand" href="./">Name That <b>Tune</b></a><span id="spUser" class="small" style="color:#fff"></span></header>
+<main class="wrap">
+
+  <!-- Spotify connect -->
+  <section class="card hide" id="spSetup">
+    <h2>Connect Spotify</h2>
+    <div id="spNeedId">
+      <p class="muted">One-time setup, about 5 minutes. You need a free Spotify developer app (your Premium account is required).</p>
+      <div class="step"><b>1</b><div>Open <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">developer.spotify.com/dashboard</a> and choose <strong>Create app</strong>.</div></div>
+      <div class="step"><b>2</b><div>Give it any name. For <strong>Redirect URI</strong>, paste exactly: <code id="redir"></code> <button class="tiny" id="copyRedir" type="button">Copy</button></div></div>
+      <div class="step"><b>3</b><div>Tick <strong>Web API</strong> and <strong>Web Playback SDK</strong>, then save.</div></div>
+      <div class="step"><b>4</b><div>Open the app's <strong>Settings</strong>, copy the <strong>Client ID</strong>, and paste it here:</div></div>
+      <div class="row"><input class="grow" id="clientId" placeholder="Client ID" autocomplete="off"><button class="primary" id="saveId">Save &amp; sign in</button></div>
+    </div>
+    <div id="spLogin" class="hide">
+      <p class="muted">Sign in with the Spotify account that will play the music.</p>
+      <div class="row"><button class="primary" id="loginBtn">Sign in with Spotify</button><button class="ghost tiny" id="changeId">Change Client ID</button></div>
+    </div>
+    <p class="err" id="spErr" role="alert"></p>
+  </section>
+
+  <div class="grid hide" id="app">
+    <div>
+      <!-- Game + join -->
+      <section class="card" id="gameCard">
+        <div class="row" style="justify-content:space-between"><h2 style="margin:0">Players join here</h2><span class="state" id="stateChip">Lobby</span></div>
+        <div id="noGame" class="hide" style="margin-top:12px"><button class="primary" id="newGame">Start a new game</button></div>
+        <div id="hasGame" class="joinbox" style="margin-top:12px">
+          <div id="qr"></div>
+          <div class="grow">
+            <div class="bigcode" id="bigCode">····</div>
+            <div class="muted small">Go to <span class="joinurl" id="joinUrl"></span> and enter the code</div>
+            <div class="row" style="margin-top:8px"><button class="tiny" id="copyLink">Copy invite link</button><button class="tiny ghost" id="endGame">End game</button></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Round -->
+      <section class="card round" id="roundCard">
+        <div class="num" id="roundNum">No song playing yet</div>
+        <div class="now hide" id="now"></div>
+        <div id="buzzBox"></div>
+        <div class="judge hide" id="judge"><button class="good" id="okBtn">✓ Correct</button><button class="primary" id="noBtn">✗ Wrong</button></div>
+        <div class="row ctrls">
+          <button class="primary" id="nextBtn" style="font-size:18px;min-height:54px">▶ Play first song</button>
+        </div>
+        <div class="row ctrls">
+          <button class="tiny" id="pauseBtn">Pause music</button>
+          <button class="tiny" id="resumeBtn">Resume music</button>
+          <button class="tiny" id="replayBtn">Replay clip</button>
+          <button class="tiny" id="revealBtn">Reveal answer</button>
+          <button class="tiny" id="lockBtn">Pause buzzers</button>
+          <button class="tiny" id="hideBtn" aria-pressed="false">Hide answer</button>
+        </div>
+      </section>
+
+      <!-- Scores -->
+      <section class="card">
+        <div class="row" style="justify-content:space-between"><h2 style="margin:0">Scoreboard</h2><button class="tiny ghost" id="resetScores">Reset scores</button></div>
+        <ol class="list" id="board" style="margin-top:8px"></ol>
+      </section>
+    </div>
+
+    <div>
+      <!-- Songs -->
+      <section class="card">
+        <h2>Songs</h2>
+        <div class="tabs" role="tablist">
+          <button role="tab" aria-selected="true" data-tab="queue">Game list (<span id="qCount">0</span>)</button>
+          <button role="tab" aria-selected="false" data-tab="playlists">My playlists</button>
+          <button role="tab" aria-selected="false" data-tab="search">Search</button>
+        </div>
+        <div data-pane="queue">
+          <div class="row"><button class="tiny" id="shuffle">Shuffle</button><button class="tiny" id="saveQ">Save as Spotify playlist</button><button class="tiny ghost" id="clearQ">Clear</button></div>
+          <div class="scroller"><ol class="list queue" id="queue"></ol></div>
+        </div>
+        <div data-pane="playlists" class="hide">
+          <p class="muted small" style="margin:0">Tap a playlist to load its songs into the game. Spotify only lets this app read playlists you created or collaborate on.</p>
+          <div class="scroller"><ul class="list" id="playlists"></ul></div>
+        </div>
+        <div data-pane="search" class="hide">
+          <form class="row" id="searchForm"><input class="grow" id="q" placeholder="Song or artist" autocomplete="off"><button class="primary">Search</button></form>
+          <div class="scroller"><ul class="list" id="results"></ul></div>
+        </div>
+      </section>
+
+      <!-- Playback + settings -->
+      <section class="card">
+        <h2>Speaker &amp; rules</h2>
+        <label for="device">Play music on</label>
+        <div class="row"><select class="grow" id="device"></select><button class="tiny" id="refreshDev">Refresh</button></div>
+        <p class="muted small" id="devHint">Open Spotify on the phone, computer or speaker you want to use, then tap Refresh. Or use this browser (desktop Chrome, Edge or Firefox).</p>
+        <div class="setgrid">
+          <div><label for="startAt">Start each song</label><select id="startAt"><option value="0">From the beginning</option><option value="30">30 seconds in</option><option value="rand">At a random spot</option></select></div>
+          <div><label for="pts">Points for correct</label><select id="pts"><option>1</option><option>2</option><option>3</option><option>5</option><option>10</option></select></div>
+          <div><label for="pen">Points lost if wrong</label><select id="pen"><option>0</option><option>1</option><option>2</option></select></div>
+        </div>
+        <label class="chk"><input type="checkbox" id="autoPause" checked> Pause the music when someone buzzes</label>
+        <label class="chk"><input type="checkbox" id="sound" checked> Play a buzzer sound on this screen</label>
+        <div class="row" style="margin-top:16px"><button class="tiny ghost" id="logout">Sign out of Spotify</button></div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="common.js"></script>
+<script>
+{
+  /* ---------- Spotify auth (PKCE, no server needed) ---------- */
+  const REDIRECT = location.origin + '/host.html';
+  const SCOPES = 'user-read-private user-read-email playlist-read-private playlist-read-collaborative playlist-modify-private playlist-modify-public user-read-playback-state user-modify-playback-state user-read-currently-playing streaming';
+  let clientId = store.get('sp_client_id') || '';
+  let tok = store.get('sp_token');
+  $('#redir').textContent = REDIRECT;
+
+  const b64url = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
+  async function login() {
+    const v = b64url(crypto.getRandomValues(new Uint8Array(48)));
+    store.set('sp_verifier', v);
+    const ch = b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v)));
+    location.href = 'https://accounts.spotify.com/authorize?' + new URLSearchParams({ client_id: clientId, response_type: 'code', redirect_uri: REDIRECT, scope: SCOPES, code_challenge_method: 'S256', code_challenge: ch });
+  }
+  async function tokenReq(body) {
+    const r = await fetch('https://accounts.spotify.com/api/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: clientId, ...body }) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error_description || j.error || 'Spotify sign-in failed');
+    tok = { access: j.access_token, refresh: j.refresh_token || tok?.refresh, exp: Date.now() + (j.expires_in - 60) * 1000 };
+    store.set('sp_token', tok);
+  }
+  async function token() {
+    if (!tok) throw new Error('Not signed in to Spotify');
+    if (Date.now() > tok.exp) await tokenReq({ grant_type: 'refresh_token', refresh_token: tok.refresh });
+    return tok.access;
+  }
+  async function sp(path, opts = {}) {
+    const r = await fetch('https://api.spotify.com/v1' + path, { ...opts, headers: { Authorization: 'Bearer ' + await token(), 'Content-Type': 'application/json' } });
+    if (r.status === 204 || r.status === 202) return null;
+    const txt = await r.text(); let j = null; try { j = txt ? JSON.parse(txt) : null; } catch {}
+    if (!r.ok) {
+      const m = j?.error?.message || ('Spotify error ' + r.status);
+      if (r.status === 404 && /device/i.test(m + path)) throw new Error('No active Spotify device. Open Spotify on your speaker or phone, tap Refresh, and pick it.');
+      if (r.status === 401) { tok = null; store.del('sp_token'); showSetup(); }
+      throw new Error(m);
+    }
+    return j;
+  }
+
+  function showSetup() {
+    $('#app').classList.add('hide'); $('#spSetup').classList.remove('hide');
+    $('#spNeedId').classList.toggle('hide', !!clientId); $('#spLogin').classList.toggle('hide', !clientId);
+  }
+  $('#copyRedir').onclick = () => navigator.clipboard.writeText(REDIRECT).then(() => toast('Copied'), () => {});
+  $('#saveId').onclick = () => { const v = $('#clientId').value.trim(); if (!/^[0-9a-f]{32}$/i.test(v)) { $('#spErr').textContent = 'That doesn’t look like a Client ID (32 letters and numbers).'; return; } clientId = v; store.set('sp_client_id', v); login(); };
+  $('#loginBtn').onclick = login;
+  $('#changeId').onclick = () => { clientId = ''; store.del('sp_client_id'); showSetup(); };
+  $('#logout').onclick = () => { tok = null; store.del('sp_token'); showSetup(); };
+
+  /* ---------- State ---------- */
+  let queue = store.get('host_queue') || [], idx = store.get('host_idx') ?? -1;
+  let host = store.get('host_game'), game = null, players = [], stopWatch = null, lastBuzz = null, hideAns = false;
+  let deviceId = store.get('sp_device') || '', webPlayer = null, webDeviceId = null, me = null;
+  const saveQ = () => { store.set('host_queue', queue); store.set('host_idx', idx); };
+  const settings = ['startAt', 'pts', 'pen', 'autoPause', 'sound'];
+  const saved = store.get('host_settings') || {};
+  settings.forEach(k => { const el = $('#' + k); if (saved[k] !== undefined) el.type === 'checkbox' ? el.checked = saved[k] : el.value = saved[k];
+    el.onchange = () => { const o = {}; settings.forEach(s => { const e = $('#' + s); o[s] = e.type === 'checkbox' ? e.checked : e.value; }); store.set('host_settings', o); }; });
+
+  const mapTrack = t => t && t.type === 'track' && !t.is_local && t.uri ? ({ uri: t.uri, title: t.name, artist: (t.artists || []).map(a => a.name).join(', '), art: (t.album?.images || []).slice(-2)[0]?.url || t.album?.images?.[0]?.url || '', dur: t.duration_ms || 0 }) : null;
+  const row = (s, right = '') => `${s.art ? `<img class="art" src="${esc(s.art)}" alt="">` : '<span class="art"></span>'}<div class="meta"><div class="t">${esc(s.title)}</div><div class="s">${esc(s.artist)}</div></div>${right}`;
+
+  /* ---------- Songs ---------- */
+  document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => {
+    document.querySelectorAll('[data-tab]').forEach(x => x.setAttribute('aria-selected', x === b));
+    document.querySelectorAll('[data-pane]').forEach(p => p.classList.toggle('hide', p.dataset.pane !== b.dataset.tab));
+    if (b.dataset.tab === 'playlists') loadPlaylists();
+  });
+  function renderQueue() {
+    $('#qCount').textContent = queue.length;
+    $('#queue').innerHTML = queue.map((s, i) => `<li class="${i < idx ? 'played' : ''} ${i === idx ? 'current' : ''}"><span class="qn">${i + 1}</span>${row(s, `<button class="tiny ghost" data-rm="${i}" aria-label="Remove">✕</button>`)}</li>`).join('')
+      || '<li class="muted">No songs yet. Load one of your playlists or search for songs.</li>';
+    $('#nextBtn').textContent = idx < 0 ? '▶ Play first song' : idx + 1 >= queue.length ? 'No more songs' : '▶ Next song';
+    $('#nextBtn').disabled = idx + 1 >= queue.length || !host;
+  }
+  $('#queue').onclick = e => { const i = e.target.dataset.rm; if (i === undefined) return; queue.splice(+i, 1); if (+i < idx) idx--; else if (+i === idx) idx--; saveQ(); renderQueue(); };
+  $('#shuffle').onclick = () => { const rest = queue.slice(idx + 1); for (let i = rest.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [rest[i], rest[j]] = [rest[j], rest[i]]; } queue = queue.slice(0, idx + 1).concat(rest); saveQ(); renderQueue(); toast('Upcoming songs shuffled'); };
+  $('#clearQ').onclick = () => { queue = []; idx = -1; saveQ(); renderQueue(); };
+  $('#saveQ').onclick = async () => {
+    if (!queue.length) return toast('Add some songs first');
+    try {
+      const pl = await sp('/me/playlists', { method: 'POST', body: JSON.stringify({ name: 'Name That Tune – ' + new Date().toLocaleDateString(), public: false, description: 'Made for a Name That Tune game' }) });
+      for (let i = 0; i < queue.length; i += 100) await sp('/playlists/' + pl.id + '/items', { method: 'POST', body: JSON.stringify({ uris: queue.slice(i, i + 100).map(s => s.uri) }) });
+      toast('Saved “' + pl.name + '” to your Spotify'); plCache = null;
+    } catch (err) { toast(err.message); }
+  };
+
+  let plCache = null;
+  async function loadPlaylists() {
+    if (plCache) return;
+    $('#playlists').innerHTML = '<li class="muted">Loading…</li>';
+    try {
+      let out = [], url = '/me/playlists?limit=50';
+      while (url && out.length < 200) { const j = await sp(url); out = out.concat(j.items || []); url = j.next ? j.next.replace('https://api.spotify.com/v1', '') : null; }
+      plCache = out.filter(Boolean);
+      $('#playlists').innerHTML = plCache.map((p, i) => { const n = p.items?.total ?? p.tracks?.total; const mine = me && p.owner?.id === me.id;
+        return `<li class="pl" data-pl="${i}" tabindex="0">${row({ title: p.name, artist: (mine ? 'Yours' : 'By ' + (p.owner?.display_name || 'someone')) + (n != null ? ' · ' + n + ' songs' : ''), art: p.images?.slice(-1)[0]?.url || p.images?.[0]?.url })}</li>`; }).join('') || '<li class="muted">No playlists found.</li>';
+    } catch (err) { plCache = null; $('#playlists').innerHTML = `<li class="err">${esc(err.message)}</li>`; }
+  }
+  async function usePlaylist(i) {
+    const p = plCache[i]; toast('Loading “' + p.name + '”…');
+    try {
+      let out = [], url = '/playlists/' + p.id + '/items?limit=100';
+      while (url && out.length < 1000) { const j = await sp(url); out = out.concat((j.items || []).map(e => mapTrack(e.item || e.track)).filter(Boolean)); url = j.next ? j.next.replace('https://api.spotify.com/v1', '') : null; }
+      if (!out.length) return toast('No playable songs in that playlist');
+      for (let k = out.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [out[k], out[j]] = [out[j], out[k]]; }
+      queue = out; idx = -1; saveQ(); renderQueue();
+      document.querySelector('[data-tab=queue]').click(); toast('Loaded ' + out.length + ' songs (shuffled)');
+    } catch (err) { toast(/forbidden|403/i.test(err.message) ? 'Spotify only allows playlists you own or collaborate on. Try copying it into your own playlist.' : err.message); }
+  }
+  $('#playlists').onclick = e => { const li = e.target.closest('[data-pl]'); if (li) usePlaylist(+li.dataset.pl); };
+  $('#playlists').onkeydown = e => { if (e.key === 'Enter') { const li = e.target.closest('[data-pl]'); if (li) usePlaylist(+li.dataset.pl); } };
+
+  let results = [];
+  $('#searchForm').onsubmit = async e => {
+    e.preventDefault(); const q = $('#q').value.trim(); if (!q) return;
+    $('#results').innerHTML = '<li class="muted">Searching…</li>';
+    try {
+      const j = await sp('/search?' + new URLSearchParams({ q, type: 'track', limit: 10 }));
+      results = (j.tracks?.items || []).map(mapTrack).filter(Boolean);
+      $('#results').innerHTML = results.map((s, i) => `<li>${row(s, `<button class="tiny" data-add="${i}">${queue.some(x => x.uri === s.uri) ? 'Added' : '+ Add'}</button>`)}</li>`).join('') || '<li class="muted">No songs found</li>';
+    } catch (err) { $('#results').innerHTML = `<li class="err">${esc(err.message)}</li>`; }
+  };
+  $('#results').onclick = e => { const i = e.target.dataset.add; if (i === undefined) return; const s = results[+i]; if (!queue.some(x => x.uri === s.uri)) { queue.push(s); saveQ(); renderQueue(); } e.target.textContent = 'Added'; };
+
+  /* ---------- Playback ---------- */
+  async function loadDevices() {
+    const sel = $('#device');
+    try {
+      const j = await sp('/me/player/devices');
+      const devs = (j?.devices || []).filter(d => d.id !== webDeviceId);
+      sel.innerHTML = `<option value="">Choose a speaker…</option>` + devs.map(d => `<option value="${esc(d.id)}">${esc(d.name)} (${esc(d.type)})</option>`).join('') + `<option value="__web">${webDeviceId ? 'This browser (ready)' : 'This browser'}</option>`;
+      const active = devs.find(d => d.is_active);
+      if (deviceId === '__web' || (webDeviceId && deviceId === webDeviceId)) sel.value = '__web';
+      else if (devs.some(d => d.id === deviceId)) sel.value = deviceId;
+      else if (active) { sel.value = active.id; deviceId = active.id; }
+    } catch (err) { toast(err.message); }
+  }
+  $('#refreshDev').onclick = loadDevices;
+  $('#device').onchange = async () => {
+    const v = $('#device').value;
+    if (v === '__web') { await startWebPlayer(); deviceId = '__web'; } else deviceId = v;
+    store.set('sp_device', deviceId);
+  };
+  function startWebPlayer() {
+    return new Promise(res => {
+      if (webDeviceId) return res();
+      const init = () => {
+        webPlayer = new Spotify.Player({ name: 'Name That Tune (browser)', getOAuthToken: cb => token().then(cb), volume: 0.85 });
+        webPlayer.addListener('ready', ({ device_id }) => { webDeviceId = device_id; toast('This browser is ready to play'); res(); });
+        webPlayer.addListener('initialization_error', ({ message }) => { toast('This browser can’t play Spotify: ' + message); res(); });
+        webPlayer.addListener('account_error', () => { toast('Browser playback needs Spotify Premium'); res(); });
+        webPlayer.addListener('authentication_error', ({ message }) => { toast(message); res(); });
+        webPlayer.connect(); try { webPlayer.activateElement(); } catch {}
+      };
+      if (window.Spotify) init();
+      else { window.onSpotifyWebPlaybackSDKReady = init; const s = document.createElement('script'); s.src = 'https://sdk.scdn.co/spotify-player.js'; document.head.append(s); }
+    });
+  }
+  const devParam = () => { const id = deviceId === '__web' ? webDeviceId : deviceId; return id ? '?device_id=' + encodeURIComponent(id) : ''; };
+  function startPos(s) {
+    const v = $('#startAt').value;
+    if (v === 'rand' && s.dur > 60000) return Math.floor(s.dur * (0.15 + Math.random() * 0.45));
+    if (v === '30' && s.dur > 45000) return 30000;
+    return 0;
+  }
+  let curPos = 0;
+  const playSong = s => sp('/me/player/play' + devParam(), { method: 'PUT', body: JSON.stringify({ uris: [s.uri], position_ms: curPos }) });
+  const pause = () => sp('/me/player/pause' + devParam(), { method: 'PUT' }).catch(() => {});
+  const resume = () => sp('/me/player/play' + devParam(), { method: 'PUT' }).catch(err => toast(err.message));
+
+  /* ---------- Game ---------- */
+  const act = (action, payload = {}) => rpc('buzz_host', { p_game_id: host.game_id, p_secret: host.host_secret, p_action: action, p_payload: payload });
+  async function newGame() {
+    try {
+      host = await rpc('buzz_create_game'); store.set('host_game', host); idx = -1; saveQ(); watch();
+    } catch (err) { toast(err.message); }
+  }
+  function watch() {
+    if (stopWatch) stopWatch();
+    lastBuzz = null;
+    stopWatch = watchGame(host.game_id, g => {
+      if (!g) { host = null; store.del('host_game'); game = null; render(); return; }
+      const fresh = g.status === 'locked' && g.buzz_player_id && (g.buzz_player_id + g.round + (g.buzz_at || '')) !== lastBuzz;
+      if (fresh) { lastBuzz = g.buzz_player_id + g.round + (g.buzz_at || ''); if ($('#autoPause').checked) pause(); if ($('#sound').checked) beep(); }
+      game = g; render();
+    }, p => { players = p; render(); });
+  }
+  $('#newGame').onclick = newGame;
+  $('#endGame').onclick = async () => { if (!host) return; if ($('#endGame').dataset.sure !== '1') { $('#endGame').dataset.sure = '1'; $('#endGame').textContent = 'Tap again to end'; setTimeout(() => { $('#endGame').dataset.sure = ''; $('#endGame').textContent = 'End game'; }, 3000); return; }
+    try { await act('end'); } catch {} pause(); if (stopWatch) stopWatch(); host = null; game = null; store.del('host_game'); render(); };
+  const joinLink = () => location.origin + '/?code=' + (host?.code || '');
+  $('#copyLink').onclick = () => navigator.clipboard.writeText(joinLink()).then(() => toast('Invite link copied'), () => toast(joinLink()));
+
+  $('#nextBtn').onclick = async () => {
+    if (idx + 1 >= queue.length) return;
+    if (!deviceId) { toast('Pick a speaker first (Speaker & rules)'); return; }
+    if (deviceId === '__web' && !webDeviceId) await startWebPlayer();
+    const s = queue[idx + 1]; curPos = startPos(s);
+    $('#nextBtn').disabled = true;
+    try { await playSong(s); idx++; saveQ(); await act('open'); }
+    catch (err) { toast(err.message); }
+    renderQueue(); render();
+  };
+  const cur = () => queue[idx];
+  const answer = by => ({ title: cur()?.title || '', artist: cur()?.artist || '', art: cur()?.art || '', ...(by ? { by } : {}) });
+  $('#okBtn').onclick = async () => { const p = players.find(x => x.id === game?.buzz_player_id); try { await act('correct', { points: +$('#pts').value, answer: answer(p?.name) }); } catch (err) { toast(err.message); } };
+  $('#noBtn').onclick = async () => { try { await act('wrong', { penalty: +$('#pen').value, reopen: true }); resume(); } catch (err) { toast(err.message); } };
+  $('#revealBtn').onclick = async () => { if (idx < 0) return; try { await act('reveal', { answer: answer() }); } catch (err) { toast(err.message); } };
+  $('#lockBtn').onclick = async () => { try { await act(game?.status === 'open' ? 'lock' : 'reopen'); } catch (err) { toast(err.message); } };
+  $('#pauseBtn').onclick = pause;
+  $('#resumeBtn').onclick = resume;
+  $('#replayBtn').onclick = () => cur() && playSong(cur()).catch(err => toast(err.message));
+  $('#hideBtn').onclick = () => { hideAns = !hideAns; $('#hideBtn').setAttribute('aria-pressed', hideAns); $('#hideBtn').textContent = hideAns ? 'Show answer' : 'Hide answer'; render(); };
+  $('#resetScores').onclick = async () => { try { await act('reset_scores'); toast('Scores reset'); } catch (err) { toast(err.message); } };
+  $('#board').onclick = async e => { const b = e.target.closest('button'); if (!b) return;
+    try { if (b.dataset.kick) await act('kick', { player_id: b.dataset.kick }); else await act('adjust', { player_id: b.dataset.p, delta: +b.dataset.d }); } catch (err) { toast(err.message); } };
+
+  let actx;
+  function beep() { try { actx = actx || new AudioContext(); const o = actx.createOscillator(), g = actx.createGain(); o.type = 'square'; o.frequency.value = 196; g.gain.setValueAtTime(.25, actx.currentTime); g.gain.exponentialRampToValueAtTime(.001, actx.currentTime + .6); o.connect(g).connect(actx.destination); o.start(); o.stop(actx.currentTime + .6); } catch {} }
+  document.addEventListener('click', () => { try { actx = actx || new AudioContext(); actx.resume(); } catch {} }, { once: true });
+
+  let qrFor = '';
+  function render() {
+    $('#noGame').classList.toggle('hide', !!host); $('#hasGame').classList.toggle('hide', !host);
+    if (host) {
+      $('#bigCode').textContent = host.code; $('#joinUrl').textContent = location.host;
+      if (qrFor !== host.code && window.QRCode) { $('#qr').innerHTML = ''; new QRCode($('#qr'), { text: joinLink(), width: 224, height: 224, correctLevel: QRCode.CorrectLevel.M }); qrFor = host.code; }
+    }
+    const st = game?.status || 'lobby';
+    const chip = $('#stateChip');
+    chip.textContent = !host ? 'No game' : { lobby: 'Lobby', open: 'Buzzers open', locked: game?.buzz_player_id ? 'Someone buzzed' : 'Buzzers paused', scored: 'Answer shown', ended: 'Ended' }[st];
+    chip.className = 'state' + (st === 'open' ? ' open' : '');
+
+    const s = cur();
+    $('#roundNum').textContent = s ? `Song ${idx + 1} of ${queue.length}` : (queue.length ? queue.length + ' songs ready' : 'Add songs to get started');
+    const now = $('#now');
+    if (s) { now.innerHTML = row(s).replace('class="art"', 'class="art" style="width:84px;height:84px"'); now.classList.remove('hide'); now.classList.toggle('hidden', hideAns && st !== 'scored'); }
+    else now.classList.add('hide');
+
+    const buzzer = players.find(p => p.id === game?.buzz_player_id);
+    const outNames = (game?.locked_out || []).map(id => players.find(p => p.id === id)?.name).filter(Boolean);
+    let bb = '';
+    if (st === 'locked' && buzzer) bb = `<div class="buzzed" role="alert"><div class="small" style="font-weight:700">Buzzed in first</div><div class="who">${esc(buzzer.name)}</div><div class="small">Did they get the song and the artist?</div></div>`;
+    else if (st === 'open') bb = `<p class="muted">Waiting for a buzz…${outNames.length ? ' Out this song: ' + esc(outNames.join(', ')) : ''}</p>`;
+    else if (st === 'scored') bb = `<p><strong>${esc(game.answer?.by ? game.answer.by + ' got it!' : 'Answer revealed to players')}</strong></p>`;
+    else if (st === 'locked') bb = '<p class="muted">Buzzers are paused.</p>';
+    $('#buzzBox').innerHTML = bb;
+    $('#judge').classList.toggle('hide', !(st === 'locked' && buzzer));
+    $('#lockBtn').textContent = st === 'open' ? 'Pause buzzers' : 'Open buzzers';
+    $('#lockBtn').disabled = !(st === 'open' || (st === 'locked' && !buzzer));
+    ['revealBtn', 'replayBtn'].forEach(id => $('#' + id).disabled = idx < 0);
+
+    const sorted = [...players].sort((x, y) => y.score - x.score || x.joined_at.localeCompare(y.joined_at));
+    $('#board').innerHTML = sorted.map(p => `<li><div class="meta"><div class="t">${esc(p.name)}</div></div><span class="score">${p.score}</span>
+      <button class="tiny" data-p="${p.id}" data-d="1" aria-label="Add a point to ${esc(p.name)}">+1</button><button class="tiny" data-p="${p.id}" data-d="-1" aria-label="Take a point from ${esc(p.name)}">−1</button><button class="tiny ghost" data-kick="${p.id}" aria-label="Remove ${esc(p.name)}">✕</button></li>`).join('')
+      || '<li class="muted">Nobody has joined yet. Share the code!</li>';
+    renderQueue();
+  }
+
+  /* ---------- Boot ---------- */
+  async function boot() {
+    const q = new URLSearchParams(location.search);
+    if (q.get('error')) { $('#spErr').textContent = 'Spotify sign-in was cancelled.'; history.replaceState(null, '', '/host.html'); }
+    if (q.get('code')) {
+      try { await tokenReq({ grant_type: 'authorization_code', code: q.get('code'), redirect_uri: REDIRECT, code_verifier: store.get('sp_verifier') }); }
+      catch (err) { $('#spErr').textContent = err.message + ' — check the Redirect URI matches exactly.'; }
+      history.replaceState(null, '', '/host.html');
+    }
+    if (!clientId || !tok) return showSetup();
+    try { me = await sp('/me'); $('#spUser').textContent = 'Spotify: ' + (me.display_name || me.id); }
+    catch (err) { $('#spErr').textContent = err.message; return showSetup(); }
+    $('#spSetup').classList.add('hide'); $('#app').classList.remove('hide');
+    if (host) watch(); else await newGame();
+    render(); loadDevices();
+  }
+  boot();
+}
+</script>
+</body>
+</html>

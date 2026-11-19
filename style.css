@@ -1,0 +1,54 @@
+/*
+VOICE: loud, friendly game-night energy; big targets, zero fuss.
+IDEA: a game-show podium: cobalt stage, one giant red buzzer, lemon score lights.
+PICTURE: the buzzer itself (players) / the live round card (host).
+COLOUR and TYPE: cobalt #1534c8 stage, white cards, vermilion #ff3b1f buzzer, lemon #ffe14d lights; Bungee titles + Rubik body.
+LAYOUT: one column on phones; host splits round + scoreboard / songs above 900px.
+*/
+:root{color-scheme:light dark;
+  --stage:light-dark(#1534c8,#0a1a66);--stage2:light-dark(#0f27a0,#071250);
+  --card:light-dark(#ffffff,#121a3d);--ink:light-dark(#10142b,#eef1ff);--soft:light-dark(#5a6285,#a8b0d6);
+  --line:light-dark(#e2e6f5,#26305e);--red:#ff3b1f;--redDk:#c51f08;--lemon:#ffe14d;--ok:#16a34a;--chip:light-dark(#eef1fb,#1b2550)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0}
+body{background:var(--stage);color:var(--ink);font:16px/1.5 Rubik,system-ui,sans-serif;overflow-x:clip;min-height:100vh;min-height:100dvh}
+h1,h2,.display{font-family:Bungee,Rubik,sans-serif;font-weight:400;line-height:1.05;margin:0;text-wrap:balance}
+a{color:inherit}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px max(4vw,16px);color:#fff}
+.brand{font-family:Bungee,sans-serif;font-size:20px;letter-spacing:.02em;text-decoration:none;color:#fff}
+.brand b{color:var(--lemon);font-weight:400}
+.wrap{max-width:1240px;margin:0 auto;padding:0 max(4vw,16px) 48px}
+.card{background:var(--card);border-radius:20px;padding:20px;box-shadow:0 10px 0 var(--stage2),0 18px 40px rgba(0,0,0,.18)}
+.card+.card{margin-top:18px}
+.card h2{font-size:22px;margin-bottom:12px}
+.muted{color:var(--soft)}
+.small{font-size:14px}
+label{display:block;font-weight:600;margin:12px 0 6px}
+input,select{width:100%;font:inherit;font-size:16px;padding:12px 14px;border-radius:12px;border:2px solid var(--line);background:var(--card);color:var(--ink)}
+input:focus,select:focus,button:focus-visible,a:focus-visible{outline:3px solid var(--lemon);outline-offset:2px}
+button,.btn{font:inherit;font-weight:700;min-height:44px;padding:10px 18px;border-radius:12px;border:0;cursor:pointer;background:var(--chip);color:var(--ink);text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+button:disabled{opacity:.45;cursor:not-allowed}
+.primary{background:var(--red);color:#fff;box-shadow:0 4px 0 var(--redDk)}
+.primary:active:not(:disabled){transform:translateY(3px);box-shadow:0 1px 0 var(--redDk)}
+.good{background:var(--ok);color:#fff}
+.lemon{background:var(--lemon);color:#10142b}
+.ghost{background:transparent;border:2px solid var(--line)}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.row>*{flex:0 1 auto}
+.grow{flex:1 1 200px}
+.err{color:var(--red);font-weight:600;min-height:1.5em;margin:8px 0 0}
+.hide{display:none!important}
+.list{list-style:none;margin:0;padding:0}
+.list li{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+.list li:last-child{border-bottom:0}
+.art{width:44px;height:44px;border-radius:8px;object-fit:cover;background:var(--chip);flex:none}
+.t{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.s{font-size:14px;color:var(--soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.meta{flex:1 1 auto;min-width:0}
+.score{font-family:Bungee,sans-serif;font-size:22px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tiny{min-height:36px;padding:6px 12px;font-size:14px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.tabs button[aria-selected=true]{background:var(--stage);color:#fff}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#10142b;color:#fff;padding:12px 18px;border-radius:12px;font-weight:600;z-index:50;max-width:92vw}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
